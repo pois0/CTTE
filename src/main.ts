@@ -9,17 +9,17 @@ function main(_: Event) {
   const width = window.innerWidth;
 
   const canvas = getCanvasWithSize(height, width);
-  const ctx = canvas.getContext("2d");
+  const ctx = canvas.getContext("2d", { alpha: false });
   if (!ctx) return;
-  const imageData = ctx.createImageData(width, height);
   const colorData = getAntiAliasedImage(getOriginalImage(height, width), height, width);
+  const imageData = ctx.createImageData(width, height);
   const data = imageData.data;
   {
     let i = 0;
     for (let x = 0; x < height; x++) {
       for (let y = 0; y < width; y++) {
         data[i * 4 + 0] = 0;
-        data[i * 4 + 1] = colorData[i] * 0x20;
+        data[i * 4 + 1] = Math.round(colorData[i] * 0x80);
         data[i * 4 + 2] = 0;
         data[i * 4 + 3] = 255;
         i++;
@@ -36,36 +36,38 @@ function getCanvasWithSize(height: number, width: number): HTMLCanvasElement {
   return canvas;
 }
 
-function getOriginalImage(height: number, width: number): Int8Array {
-  const original = new Int8Array(height * width);
+function getOriginalImage(height: number, width: number): Float32Array {
+  const original = new Float32Array(height * width);
   {
     let i = 0;
     for (let x = 0; x < height; x++)
       for (let y = 0; y < width; y++)
-        original[i++] = getRandomPixel(height, x);
+        original[i++] = getRandomPixel(x / height);
   }
   return original;
 }
 
-function getAntiAliasedImage(original: Int8Array, height: number, width: number): Int8Array {
-  const result = new Int8Array(height * width);
+function getAntiAliasedImage(original: Float32Array, height: number, width: number): Float32Array {
+  const result = new Float32Array(height * width);
   {
     let i = 0;
-    for (let x = 0; x < height; x++)
+    for (let x = 0; x < height; x++) {
+      const cosVal =Math.cos(x * Math.PI);
       for (let y = 0; y < width; y++) {
-        let sum = 0;
+        let sum = original[i];
         if (x != 0) sum += original[i - width];
         if (x != height - 1) sum += original[i + width]; else sum++;
-        if (y != 0) sum += original[i - 1]; else sum += x < (height / 2) ? 0 : 1;
-        if (y != width - 1) sum += original[i + 1]; else sum += x < (height / 2) ? 0 : 1;
-        result[i++] = sum;
+        if (y != 0) sum += original[i - 1]; else sum += cosVal;
+        if (y != width - 1) sum += original[i + 1]; else sum += cosVal;
+        result[i++] = sum / 5;
       }
+    }
   }
   return result;
 }
 
-function getRandomPixel(height: number, x: number): number {
-  const rand = Math.random();
-  const check = (Math.cos(x * Math.PI / height) + 1) / 2;
-  return rand < check ? 0 : 1;
+function getRandomPixel(x: number): number {
+  const rand = 2 * Math.random() - 1;
+  const cosRes = -Math.cos(x * Math.PI);
+  return (cosRes + 1) / 2 + rand * (-Math.abs(cosRes) + 1) / 2.25;
 }
