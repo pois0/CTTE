@@ -1,17 +1,55 @@
 export {};
 
-document.addEventListener("DOMContentLoaded", main);
-window.addEventListener('resize', main);
-window.addEventListener('click', main);
+document.addEventListener("DOMContentLoaded", onSizeUpdated);
+window.addEventListener('resize', onSizeUpdated);
+window.addEventListener('click', onClick);
 
-function main(_: Event) {
-  const height = window.innerHeight;
-  const width = window.innerWidth;
+let currentHeight = 0;
+let currentWidth = 0;
+let canvasCtx: CanvasRenderingContext2D | null = null;
+let currentImage = new Float32Array(0);
+let animateProcessId = 0;
+let oldStamp = 0;
 
-  const canvas = getCanvasWithSize(height, width);
-  const ctx = canvas.getContext("2d", { alpha: false });
+function onSizeUpdated(_: Event) {
+  updateSize();
+  drawImage(getAntiAliasedImage(currentImage, currentHeight, currentWidth));
+}
+
+function onClick(_: Event) {
+  if (animateProcessId !== 0) {
+    console.log("Stop animation");
+    window.cancelAnimationFrame(animateProcessId);
+    animateProcessId = 0;
+  } else {
+    console.log("Start animation");
+    animateProcessId = window.requestAnimationFrame(animate);
+  }
+}
+
+function updateSize() {
+  currentHeight = window.innerHeight;
+  currentWidth = window.innerWidth;
+  const canvas = document.getElementById("main") as HTMLCanvasElement;
+  canvas.height = currentHeight;
+  canvas.width = currentWidth;
+  canvasCtx = canvas.getContext("2d", { alpha: false });
+  currentImage = initializeImage(currentHeight, currentWidth);
+}
+
+function animate(stamp: DOMHighResTimeStamp) {
+  const interval = stamp - oldStamp;
+  oldStamp = stamp;
+  const image = currentImage = transitImage(currentImage, currentHeight, currentWidth, interval);
+  drawImage(getAntiAliasedImage(image, currentHeight, currentWidth));
+  animateProcessId = window.requestAnimationFrame(animate);
+}
+
+function drawImage(colorData: Float32Array) {
+  const height = currentHeight;
+  const width = currentWidth;
+  const ctx = canvasCtx;
   if (!ctx) return;
-  const colorData = getAntiAliasedImage(getOriginalImage(height, width), height, width);
   const imageData = ctx.createImageData(width, height);
   const data = imageData.data;
   {
@@ -29,20 +67,19 @@ function main(_: Event) {
   ctx.putImageData(imageData, 0, 0);
 }
 
-function getCanvasWithSize(height: number, width: number): HTMLCanvasElement {
-  const canvas = document.getElementById("main") as HTMLCanvasElement;
-  canvas.height = height;
-  canvas.width = width;
-  return canvas;
-}
-
-function getOriginalImage(height: number, width: number): Float32Array {
+function initializeImage(height: number, width: number): Float32Array {
   const original = new Float32Array(height * width);
   {
     let i = 0;
-    for (let x = 0; x < height; x++)
-      for (let y = 0; y < width; y++)
-        original[i++] = getRandomPixel(x / height);
+    for (let x = 0; x < height; x++) {
+      const cosVal = -Math.cos(x / height * Math.PI);
+      const mid = randomMid(cosVal);
+      const halfRange = randomHalfRange(cosVal);
+      for (let y = 0; y < width; y++) {
+        const rand = 2 * Math.random() - 1;
+        original[i++] = mid + rand * halfRange;
+      }
+    }
   }
   return original;
 }
@@ -52,22 +89,44 @@ function getAntiAliasedImage(original: Float32Array, height: number, width: numb
   {
     let i = 0;
     for (let x = 0; x < height; x++) {
-      const cosVal =Math.cos(x * Math.PI);
+      const cosVal = Math.cos(x * Math.PI);
       for (let y = 0; y < width; y++) {
-        let sum = original[i];
+        let sum = 4 * original[i];
         if (x != 0) sum += original[i - width];
         if (x != height - 1) sum += original[i + width]; else sum++;
         if (y != 0) sum += original[i - 1]; else sum += cosVal;
         if (y != width - 1) sum += original[i + 1]; else sum += cosVal;
-        result[i++] = sum / 5;
+        result[i++] = sum / 8;
       }
     }
   }
   return result;
 }
 
-function getRandomPixel(x: number): number {
-  const rand = 2 * Math.random() - 1;
-  const cosRes = -Math.cos(x * Math.PI);
-  return (cosRes + 1) / 2 + rand * (-Math.abs(cosRes) + 1) / 2.25;
+function transitImage(original: Float32Array, height: number, width: number, interval: number): Float32Array {
+  const magic = Math.min(1, interval / 60);
+  {
+    let i = 0;
+    for (let x = 0; x < height; x++) {
+      const cosVal = -Math.cos(x / height * Math.PI);
+      const mid = randomMid(cosVal);
+      const halfRange = randomHalfRange(cosVal);
+      for (let y = 0; y < width; y++) {
+        const org = original[i];
+        const diff = org - mid;
+        const diffRate = diff / halfRange;
+        const moveSize = Math.min(mid + halfRange - org, org - mid + halfRange) / 3 * magic * Math.sign(2 * Math.random() - 1 - (diffRate));
+        original[i++] = org + moveSize;
+      }
+    }
+  }
+  return original;
+}
+
+function randomMid(cosVal: number) {
+  return (cosVal + 1) / 2;
+}
+
+function randomHalfRange(cosVal: number) {
+  return (-Math.abs(cosVal) + 1) / 2.25;
 }
