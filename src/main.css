@@ -1,0 +1,15 @@
+.no-space {
+  padding: 0;
+  margin: 0;
+}
+
+.top-left {
+  position: absolute;
+  top: 0px;
+  left: 0px;
+}
+
+#fr-view {
+  color: #FFF;
+  font-family: monospace;
+}
