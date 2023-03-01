@@ -1,4 +1,4 @@
-import { getAntiAliasedImage, initializeImage, transitImage } from "./images";
+import { initializeImage, drawImage as drawImageInner, getAntiAliasedImagePartially, transitImagePartially } from "./images";
 
 export {};
 
@@ -36,18 +36,24 @@ function onClick(_: Event) {
 }
 
 function onKeyDown(e: KeyboardEvent) {
-  if (e.key == "d") {
-    if (frProcessId != 0) {
-      frView.setAttribute("style", "display: none;");
-      clearInterval(frProcessId);
-      frProcessId = 0;
-    } else {
-      frView.setAttribute("style", "");
-      frView.innerText = "0 fps";
-      frames = 0;
-      lastFpsCalc = Date.now();
-      frProcessId = setInterval(calcFrameRate, 1000);
-    }
+  switch (e.key) {
+  case "d":
+    toggleVisibilityOfFrView();
+    break;
+  }
+}
+
+function toggleVisibilityOfFrView() {
+  if (frProcessId != 0) {
+    frView.setAttribute("style", "display: none;");
+    clearInterval(frProcessId);
+    frProcessId = 0;
+  } else {
+    frView.setAttribute("style", "");
+    frView.innerText = "0 fps";
+    frames = 0;
+    lastFpsCalc = Date.now();
+    frProcessId = setInterval(calcFrameRate, 1000);
   }
 }
 
@@ -80,24 +86,15 @@ function calcFrameRate() {
 }
 
 function drawImage(colorData: Float32Array) {
-  const height = currentHeight;
-  const width = currentWidth;
   const ctx = canvasCtx;
   if (!ctx) return;
-  const imageData = ctx.createImageData(width, height);
-  const data = imageData.data;
-  {
-    let i = 0;
-    for (let x = 0; x < height; x++) {
-      for (let y = 0; y < width; y++) {
-        data[i * 4 + 0] = 0;
-        data[i * 4 + 1] = Math.round(colorData[i] * 0x80);
-        data[i * 4 + 2] = 0;
-        data[i * 4 + 3] = 255;
-        i++;
-      }
-    }
-  }
-  ctx.putImageData(imageData, 0, 0);
+  drawImageInner(ctx, currentHeight, currentWidth, colorData);
 }
 
+function getAntiAliasedImage(original: Float32Array, height: number, width: number): Float32Array {
+  return getAntiAliasedImagePartially(original, new Float32Array(height * width), 0, height, height, width);
+}
+
+function transitImage(original: Float32Array, height: number, width: number, interval: number): Float32Array {
+  return transitImagePartially(original, original, 0, height, height, width, Math.min(1, interval / 60));
+}
