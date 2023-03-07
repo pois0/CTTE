@@ -1,4 +1,4 @@
-import { initializeImage, drawImage as drawImageInner, getAntiAliasedImagePartially, transitImagePartially } from "./images";
+import { initializeImage, drawImage as drawImageInner, getAntiAliasedImagePartially, transitImagePartially } from "./common/images";
 
 export {};
 
