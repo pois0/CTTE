@@ -1,16 +1,20 @@
 import { setupWorker } from "../common/thread-pool";
-import { MessageType, Request } from "../protocol";
-
-export {};
+import { MessageType, Request, TransitionRequest } from "../common/protocol";
+import { getAntiAliasedImagePartially, transitImagePartially } from "../common/images";
 
 declare const self: DedicatedWorkerGlobalScope;
+export {};
 
-setupWorker((req: Request) => {
+setupWorker(self, (req: Request) => {
   switch (req.messageType) {
-  case MessageType.TransitionRequest:
-    break;
-  case MessageType.AntialiasingRequest:
-    break;
+  case MessageType.TransitionRequest: {
+    const q = req as TransitionRequest;
+    transitImagePartially(new Float32Array(q.from), new Float32Array(q.to), q.offsetX, q.lengthX, q.height, q.width, q.magic);
+  } break;
+  case MessageType.AntialiasingRequest: {
+    const q = req;
+    getAntiAliasedImagePartially(new Float32Array(q.from), new Float32Array(q.to), q.offsetX, q.lengthX, q.height, q.width);
+  } break;
   }
   return 0;
 });

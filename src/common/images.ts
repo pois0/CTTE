@@ -16,8 +16,9 @@ export function drawImage(ctx: CanvasRenderingContext2D, height: number, width: 
   ctx.putImageData(imageData, 0, 0);
 }
 
-export function initializeImage(height: number, width: number): Float32Array {
-  const original = new Float32Array(height * width);
+export function initializeImage(height: number, width: number): SharedArrayBuffer {
+  const base = new SharedArrayBuffer(height * width * 4);
+  const original = new Float32Array(base);
   {
     let i = 0;
     for (let x = 0; x < height; x++) {
@@ -30,7 +31,7 @@ export function initializeImage(height: number, width: number): Float32Array {
       }
     }
   }
-  return original;
+  return base;
 }
 
 export function getAntiAliasedImagePartially(from: Float32Array, to: Float32Array, offsetX: number, lengthX: number, height: number, width: number): Float32Array {

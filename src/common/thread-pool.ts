@@ -3,28 +3,36 @@ type Resolver<T> = (a0: T | PromiseLike<T>) => void;
 export class ThreadPool<Request, Response> {
   private workers: Readonly<Worker[]>;
   private workerQueue: Queue<WorkerHolder<Response>>;
-  private messageQueue: Queue<[Request, Transferable[], Resolver<Response>]>;
+  private messageQueue: Queue<[Request, Transferable[] | undefined, Resolver<Response>]>;
 
-  constructor(numberOfThreads: number, scriptUrl: string | URL) {
-    const workers = this.workers = new Array(numberOfThreads);
-    const workerQueue = this.workerQueue = new Queue(numberOfThreads);
-    for (let i = 0; i < numberOfThreads; i++) {
-      const worker = workers[i] = new Worker(scriptUrl);
+  constructor(workers: Worker[]) {
+    this.workers = workers;
+    this.workerQueue = new Queue(workers.length);
+    for (let i = 0; i < workers.length; i++) {
+      const worker = workers[i];
       const holder = new WorkerHolder<Response>(worker);
+      this.workerQueue.push(holder);
       worker.onmessage = (e: MessageEvent<ResponseWrapper<Response>>) => {
         const resolve = holder.getResolver();
         if (resolve == null) {
           throw "Illegal state error";
         }
-        resolve(e.data.getMessage());
+        resolve(e.data.message);
         this.recycleWorker(holder);
       };
-      workerQueue.push(holder);
     }
     this.messageQueue = new Queue();
   }
 
-  async enqueue(message: Request, transfer: Transferable[]): Promise<Response> {
+  static create<Request, Response>(numberOfThreads: number, scriptUrl: string | URL): ThreadPool<Request, Response> {
+    const workers = new Array(numberOfThreads);
+    for (let i = 0; i < numberOfThreads; i++) {
+      workers[i] = new Worker(scriptUrl);
+    }
+    return new ThreadPool(workers);
+  }
+
+  async enqueue(message: Request, transfer?: Transferable[]): Promise<Response> {
     const holder = this.workerQueue.pop();
     if (holder != null) {
       return new Promise((resolve: Resolver<Response>) => {
@@ -35,6 +43,10 @@ export class ThreadPool<Request, Response> {
         this.messageQueue.push([message, transfer, resolve]);
       });
     }
+  }
+
+  getWorkerSize(): number {
+    return this.workers.length;
   }
 
   terminate() {
@@ -51,37 +63,26 @@ export class ThreadPool<Request, Response> {
     }
   }
 
-  private startJob(holder: WorkerHolder<Response>, message: Request, transfer: Transferable[], resolve: Resolver<Response>) {
+  private startJob(holder: WorkerHolder<Response>, message: Request, transfer: Transferable[] | undefined, resolve: Resolver<Response>) {
     holder.setResolver(resolve);
-    holder.getWorker().postMessage(message, transfer);
+    holder.getWorker().postMessage(message, transfer ? transfer : []);
   }
-}
-
-export function respond<T>(this: Window, message: T) {
-  this.postMessage(new ResponseWrapper(message));
 }
 
 export type SetupWorkerHandler<Request, Response> = (req: Request) => Response;
 
 export function setupWorker<Request, Response>(
-  this: Window & DedicatedWorkerGlobalScope, 
+  scope: DedicatedWorkerGlobalScope, 
   handler: SetupWorkerHandler<Request, Response>
 ) {
-  this.onmessage = (e) => {
-    this.postMessage(new ResponseWrapper(handler(e.data as Request)));
+  scope.onmessage = (e) => {
+    const resp = { message: handler(e.data as Request) };
+    scope.postMessage(resp);
   };
 }
 
-class ResponseWrapper<T> {
-  private message: T
-
-  constructor(message: T) {
-    this.message = message;
-  }
-
-  getMessage(): T {
-    return this.message;
-  }
+interface ResponseWrapper<T> {
+  message: T
 }
 
 class WorkerHolder<T> {
