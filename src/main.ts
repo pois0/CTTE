@@ -3,8 +3,6 @@ import { ThreadPool } from "./common/thread-pool";
 import { Request, requestAntialiasing, requestTransition } from "./common/protocol";
 import ImageWorker from "./worker/worker.ts?worker";
 
-export {};
-
 document.addEventListener("DOMContentLoaded", onSizeUpdated);
 window.addEventListener('resize', onSizeUpdated);
 window.addEventListener('click', onClick);
@@ -117,8 +115,8 @@ async function getAntiAliasedImage(original: SharedArrayBuffer, height: number, 
   const promiseArr = new Array(threads);
   for (let i = 0; i < threads; i++) {
      const offset = Math.floor(height * i / threads);
-     const len = Math.floor(height * (i + 1) / threads);
-     promiseArr[i] = tpool.enqueue(requestAntialiasing(original, aliased, offset, len, height, width));
+     const nextOffset = Math.floor(height * (i + 1) / threads);
+     promiseArr[i] = tpool.enqueue(requestAntialiasing(original, aliased, offset, nextOffset - offset, height, width));
   }
   await Promise.all(promiseArr);
   return new Float32Array(aliased);
@@ -130,14 +128,14 @@ async function transitImage(original: SharedArrayBuffer, height: number, width: 
   const promiseArr = new Array(threads);
   for (let i = 0; i < threads; i++) {
      const offset = Math.floor(height * i / threads);
-     const len = Math.floor(height * (i + 1) / threads);
-     promiseArr[i] = tpool.enqueue(requestTransition(original, original, offset, len, height, width, magic));
+     const nextOffset = Math.floor(height * (i + 1) / threads);
+     promiseArr[i] = tpool.enqueue(requestTransition(original, original, offset, nextOffset - offset, height, width, magic));
   }
   await Promise.all(promiseArr);
   return original;
 }
 
+export let MAX_JOBS = Number.MAX_SAFE_INTEGER;
 function getConcurrentIndex(): number {
-  return 2;
-  // return Math.min(tpool.getWorkerSize(), 6);
+  return Math.min(tpool.getWorkerSize(), MAX_JOBS);
 }

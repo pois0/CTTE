@@ -34,40 +34,51 @@ export function initializeImage(height: number, width: number): SharedArrayBuffe
   return base;
 }
 
-export function getAntiAliasedImagePartially(from: Float32Array, to: Float32Array, offsetX: number, lengthX: number, height: number, width: number): Float32Array {
-  {
-    let i = offsetX * width;
-    const untilX = offsetX + lengthX;
-    for (let x = offsetX; x < untilX; x++) {
-      const cosVal = Math.cos(x * Math.PI);
-      for (let y = 0; y < width; y++) {
-        let sum = 4 * from[i];
-        if (x != 0) sum += from[i - width];
-        if (x != height - 1) sum += from[i + width]; else sum++;
-        if (y != 0) sum += from[i - 1]; else sum += cosVal;
-        if (y != width - 1) sum += from[i + 1]; else sum += cosVal;
-        to[i++] = sum / 8;
-      }
+export function getAntiAliasedImagePartially(
+  from: Float32Array,
+  to: Float32Array,
+  offsetX: number,
+  lengthX: number,
+  height: number,
+  width: number
+): Float32Array {
+  let i = offsetX * width;
+  const untilX = offsetX + lengthX;
+  for (let x = offsetX; x < untilX; x++) {
+    const cosVal = Math.cos(x * Math.PI);
+    for (let y = 0; y < width; y++) {
+      let sum = 4 * from[i];
+      if (x != 0) sum += from[i - width];
+      if (x != height - 1) sum += from[i + width]; else sum++;
+      if (y != 0) sum += from[i - 1]; else sum += cosVal;
+      if (y != width - 1) sum += from[i + 1]; else sum += cosVal;
+      to[i++] = sum / 8;
     }
   }
   return to;
 }
 
-export function transitImagePartially(from: Float32Array, to: Float32Array, offsetX: number, lengthX: number, height: number, width: number, magic: number): Float32Array {
-  {
-    let i = offsetX * width;
-    const untilX = offsetX + lengthX;
-    for (let x = offsetX; x < untilX; x++) {
-      const cosVal = -Math.cos(x / height * Math.PI);
-      const mid = randomMid(cosVal);
-      const halfRange = randomHalfRange(cosVal);
-      for (let y = 0; y < width; y++) {
-        const org = from[i];
-        const diff = org - mid;
-        const diffRate = diff / halfRange;
-        const moveSize = Math.min(mid + halfRange - org, org - mid + halfRange) / 3 * magic * Math.sign(2 * Math.random() - 1 - (diffRate));
-        to[i++] = org + moveSize;
-      }
+export function transitImagePartially(
+  from: Float32Array,
+  to: Float32Array,
+  offsetX: number,
+  lengthX: number,
+  height: number,
+  width: number,
+  magic: number
+): Float32Array {
+  let i = offsetX * width;
+  const untilX = offsetX + lengthX;
+  for (let x = offsetX; x < untilX; x++) {
+    const cosVal = -Math.cos(x / height * Math.PI);
+    const mid = randomMid(cosVal);
+    const halfRange = randomHalfRange(cosVal);
+    for (let y = 0; y < width; y++) {
+      const org = from[i];
+      const diff = org - mid;
+      const diffRate = diff / halfRange;
+      const moveSize = Math.min(mid + halfRange - org, org - mid + halfRange) / 3 * magic * Math.sign(2 * Math.random() - 1 - (diffRate));
+      to[i++] = org + moveSize;
     }
   }
   return to;
